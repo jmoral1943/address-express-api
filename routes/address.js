@@ -52,63 +52,63 @@ router.post("/", (req, res) => {
   const result = schema.validate(req.body);
 
   if (result.error) res.sendStatus(400).send(result.error.details[0].message);
-  try {
-    axios
-      .get("http://www.groupkt.com/country/get/all")
-      .then(({ data }) => {
-        let country = data.RestResponse.result.find(
-          country => req.body.country.toLowerCase() === country.name.toLowerCase()
+
+  return axios
+    .get("http://www.groupkt.com/country/get/all")
+    .then(({ data }) => {
+      let country = data.RestResponse.result.find(
+        country => req.body.country.toLowerCase() === country.name.toLowerCase()
+      );
+
+      if (!country)
+        throw new Error(
+          "The country is not a valid country or not the entire name"
         );
 
-        if (!country)
-          throw new Error(
-            "The country is not a valid country or not the entire name"
-          );
-
-        return country.alpha3_code;
-      })
-      .catch(err => {
-        res.status(400).send("" + err);
-      })
-      // second axios request to validate the state is actually in that country
-      .then(country => {
-        let url = `http://www.groupkt.com/state/get/${country}/all`
-        axios.get(url).then(({data}) => {
+      return country.alpha3_code;
+    })
+    // second axios request to validate the state is actually in that country
+    .then(country => {
+      let url = `http://www.groupkt.com/state/get/${country}/all`;
+      axios
+        .get(url)
+        .then(({ data }) => {
           let state = data.RestResponse.result.find(
             state => req.body.state.toLowerCase() === state.name.toLowerCase()
           );
-  
+
           if (!state)
             throw new Error(
               `The state is not a valid state in ${country} or you did not put the entire name`
             );
-        }).catch(err => {
-          return res.status(400).send("" + err);
+
+        }).then(() => {
+          // preparing and executing a insert query
+          
+          connection.execute(
+            "INSERT INTO addresses(name, street, city, state, country) VALUES(?,?,?,?,?)",
+            [
+              req.body.name,
+              req.body.street,
+              req.body.city,
+              req.body.state,
+              req.body.country
+            ],
+            (err, results, fields) => {
+              // handles error if there is one
+              if (err) res.sendStatus(500).send(err);
+    
+              res.send("id :" + results.insertId.toString());
+            }
+          );
         })
-      }).catch(err => {
-        return res.status(400).send("" + err);
-      })
-  } catch (err) {
-    return res.send(err);
-  }
-
-  // preparing and executing a insert query
-  connection.execute(
-    "INSERT INTO addresses(name, street, city, state, country) VALUES(?,?,?,?,?)",
-    [
-      req.body.name,
-      req.body.street,
-      req.body.city,
-      req.body.state,
-      req.body.country
-    ],
-    (err, results, fields) => {
-      // handles error if there is one
-      if (err) res.sendStatus(500).send(err);
-
-      res.send("id :" + results.insertId.toString());
-    }
-  );
+        .catch(err => {
+          return res.status(400).send("" + err);
+        });
+    })
+    .catch(err => {
+      return res.status(400).send("" + err);
+    });
 });
 
 module.exports = router;
