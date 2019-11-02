@@ -3,7 +3,11 @@ FROM node:latest
 WORKDIR /usr/src/app
 
 COPY package*.json ./
-COPY .env ./
+
+ENV DB_HOST mysql
+ENV DB_USER root
+ENV DB paperspace
+ENV DB_PASSWORD root
 
 RUN npm install
 
