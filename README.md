@@ -58,4 +58,4 @@ That's it!
 
 ## Authors
 
-- **Jonathan Morales** - _Coding Padawan_ - [jmoral1943](https://github.com/jmoral1943)
+- **Jonathan Morales**  - [jmoral1943](https://github.com/jmoral1943)
