@@ -3,7 +3,8 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
-    "start": "nodemon app.js"
+    "start": "nodemon app.js",
+    "test": "mocha"
   },
   "dependencies": {
     "@hapi/joi": "^16.1.7",
@@ -15,6 +16,9 @@
     "mysql2": "^2.0.0"
   },
   "devDependencies": {
-    "nodemon": "^1.19.4"
+    "chai": "^4.2.0",
+    "mocha": "^6.2.2",
+    "nodemon": "^1.19.4",
+    "request": "^2.88.0"
   }
 }

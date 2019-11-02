@@ -3,10 +3,11 @@ require("dotenv").config();
 const express = require("express");
 const router = express.Router();
 const mysql = require("mysql2");
-const axios = require("axios");
 
-const schema = require("../utils/validate");
+const schema = require("../utils/joi");
+const validate = require("../utils/validate");
 
+// MySQL connection
 const connection = mysql.createConnection({
   host: process.env.DB_HOST,
   user: process.env.DB_USER,
@@ -22,152 +23,95 @@ connection.execute("SET sql_mode=(SELECT REPLACE(@@sql_mode,?,?));", [
 
 // GET all addressess
 router.get("/", (req, res) => {
-  connection.execute("SELECT * FROM addresses", (err, results, fields) => {
-    if (err) res.sendStatus(500).send("Error from the Database", err);
-
-    res.send(results);
-  });
-});
-
-// POST a new address
-router.post("/", (req, res) => {
-  const result = schema.validate(req.body);
-
-  if (result.error) res.sendStatus(400).send(result.error.details[0].message);
-
-  return (
-    axios
-      .get("http://www.groupkt.com/country/get/all")
-      .then(({ data }) => {
-        let country = data.RestResponse.result.find(
-          country =>
-            req.body.country.toLowerCase() === country.name.toLowerCase()
+  if (req.query.country && req.query.state) {
+    validate(req)
+      .then(() => {
+        connection.execute(
+          "SELECT * FROM addresses WHERE country=? AND state=?",
+          [req.query.country, req.query.state],
+          (err, results, fields) => {
+            res.send(results);
+          }
         );
-
-        if (!country)
-          throw new Error(
-            "The country is not a valid country or not the entire name"
-          );
-
-        return country.alpha3_code;
-      })
-      // second axios request to validate the state is actually in that country
-      .then(country => {
-        let url = `http://www.groupkt.com/state/get/${country}/all`;
-        axios
-          .get(url)
-          .then(({ data }) => {
-            let state = data.RestResponse.result.find(
-              state => req.body.state.toLowerCase() === state.name.toLowerCase()
-            );
-
-            if (!state)
-              throw new Error(
-                `The state is not a valid state in ${country} or you did not put the entire name`
-              );
-          })
-          .then(() => {
-            // preparing and executing a insert query
-
-            connection.execute(
-              "INSERT INTO addresses(name, street, city, state, country) VALUES(?,?,?,?,?)",
-              [
-                req.body.name,
-                req.body.street,
-                req.body.city,
-                req.body.state,
-                req.body.country
-              ],
-              (err, results, fields) => {
-                // handles error if there is one
-                if (err) res.sendStatus(500).send(err);
-
-                res.send("id :" + results.insertId.toString());
-              }
-            );
-          })
-          .catch(err => {
-            return res.status(400).send("" + err);
-          });
       })
       .catch(err => {
         return res.status(400).send("" + err);
-      })
-  );
+      });
+  } else {
+    connection.execute("SELECT * FROM addresses", (err, results, fields) => {
+      if (err) return res.sendStatus(500).send("Error from the Database", err);
+      res.send(results);
+    });
+  }
+});
+
+// POST a new address
+router.post("/", async (req, res) => {
+  const result = schema.validate(req.body);
+  if (result.error)
+    return res.status(400).send(result.error.details[0].message);
+
+  validate(req)
+    .then(() => {
+      // preparing and executing a insert query
+      connection.execute(
+        "INSERT INTO addresses(name, street, city, state, country) VALUES(?,?,?,?,?)",
+        [
+          req.body.name,
+          req.body.street,
+          req.body.city,
+          req.body.state,
+          req.body.country
+        ],
+        (err, results, fields) => {
+          // handles error if there is one
+          if (err) res.sendStatus(500).send(err);
+
+          res.send("id :" + results.insertId.toString());
+        }
+      );
+    })
+    .catch(err => {
+      return res.status(400).send("" + err);
+    });
 });
 
 // UPDATE an address
 router.put("/:id", (req, res) => {
   const result = schema.validate(req.body);
+  if (result.error)
+    return res.status(400).send(result.error.details[0].message);
 
-  if (result.error) res.sendStatus(400).send(result.error.details[0].message);
+  validate(req)
+    .then(() => {
+      // preparing and executing a insert query
+      // try {
+      connection.execute(
+        "UPDATE addresses SET name=?, street=?, city=?, state=?, country=? WHERE address_id=?",
+        [
+          req.body.name,
+          req.body.street,
+          req.body.city,
+          req.body.state,
+          req.body.country,
+          req.params.id
+        ],
+        (err, results, fields) => {
+          // handles error if there is one
 
-  return (
-    axios
-      .get("http://www.groupkt.com/country/get/all")
-      .then(({ data }) => {
-        let country = data.RestResponse.result.find(
-          country =>
-            req.body.country.toLowerCase() === country.name.toLowerCase()
-        );
+          if (results.affectedRows === 0)
+            return res.status(404).send("There is no address with that Id");
 
-        if (!country)
-          throw new Error(
-            "The country is not a valid country or not the entire name"
-          );
-
-        return country.alpha3_code;
-      })
-      // second axios request to validate the state is actually in that country
-      .then(country => {
-        let url = `http://www.groupkt.com/state/get/${country}/all`;
-        axios
-          .get(url)
-          .then(({ data }) => {
-            let state = data.RestResponse.result.find(
-              state => req.body.state.toLowerCase() === state.name.toLowerCase()
-            );
-
-            if (!state)
-              throw new Error(
-                `The state is not a valid state in ${country} or you did not put the entire name`
-              );
-          })
-          .then(async () => {
-            // preparing and executing a insert query
-            // try {
-            await connection.execute(
-              "UPDATE addresses SET name=?, street=?, city=?, state=?, country=? WHERE address_id=?",
-              [
-                req.body.name,
-                req.body.street,
-                req.body.city,
-                req.body.state,
-                req.body.country,
-                req.params.id
-              ],
-              async (err, results, fields) => {
-                // handles error if there is one
-
-                if (results.affectedRows === 0)
-                  return await res
-                    .status(404)
-                    .send("There is no address with that Id");
-
-                res.send("Your address is up to date!");
-              }
-            );
-          })
-          .catch(err => {
-            return res.status(400).send("" + err);
-          });
-      })
-      .catch(err => {
-        return res.status(400).send("" + err);
-      })
-  );
+          res.send("Your address is up to date!");
+        }
+      );
+    })
+    .catch(err => {
+      return res.status(400).send("" + err);
+    });
 });
 
+// DELETING an ID
 router.delete("/:id", async (req, res) => {
   connection.execute(
     "DELETE FROM addresses WHERE address_id=?",

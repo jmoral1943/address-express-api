@@ -1,5 +1,4 @@
 const express = require('express');
-const path = require('path');
 
 const logger = require('morgan');
 const helmet = require('helmet')
@@ -19,5 +18,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
 app.use('/address', addressRouter);
-
+app.use("*", (req, res) => {
+  res.status(404).send("Not Found")
+})
 app.listen(port, () => console.log(`Listening on port ${port}`))
