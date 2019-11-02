@@ -39,7 +39,9 @@ http://localhost:3000
 ```
 If you would like to test if you can add remove and or list you can go to postman or any way of sending http request and receiving Have fun!
 
-
+```
+WARNING because node might setup the db connection first before mysql start the test might fail, if they do fail wait a while longer before rerunning the test 
+```
 After it finishes, you can view that it is working by running a few test I made with Mocha and Chai:
 
 ```
